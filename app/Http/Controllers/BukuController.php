@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateBukuRequest;
+use App\Http\Requests\StoreBukuRequest;
 use Illuminate\Http\Request;
 use App\Models\Buku;
+use Illuminate\Validation\ValidationException;
 
 class BukuController extends Controller
 {
@@ -92,16 +95,28 @@ class BukuController extends Controller
      */
     public function create()
     {
-        // Akan diimplementasi di pertemuan 12
+        // diimplementasi di pertemuan 12
         return view('buku.create');
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreBukuRequest $request)
     {
-        // Akan diimplementasi di pertemuan 12
+        try {
+            // Create buku baru dengan validated data
+            Buku::create($request->validated());
+
+            // Redirect dengan success message
+            return redirect()->route('buku.index')
+                ->with('success', 'Buku berhasil ditambahkan!');
+        } catch (\Exception $e) {
+            // Redirect dengan error message jika gagal
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Gagal menambahkan buku: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -121,7 +136,6 @@ class BukuController extends Controller
      */
     public function edit(string $id)
     {
-        // Akan diimplementasi di pertemuan 12
         $buku = Buku::findOrFail($id);
         return view('buku.edit', compact('buku'));
     }
@@ -129,9 +143,23 @@ class BukuController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(UpdateBukuRequest $request, string $id)
     {
-        // Akan diimplementasi di pertemuan 12
+        try {
+            $buku = Buku::findOrFail($id);
+
+            // Update buku dengan validated data
+            $buku->update($request->validated());
+
+            // Redirect dengan success message
+            return redirect()->route('buku.show', $buku->id)
+                ->with('success', 'Buku berhasil diupdate!');
+        } catch (\Exception $e) {
+            // Redirect dengan error message jika gagal
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Gagal mengupdate buku: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -139,7 +167,21 @@ class BukuController extends Controller
      */
     public function destroy(string $id)
     {
-        // Akan diimplementasi di pertemuan 12
+        try {
+            $buku = Buku::findOrFail($id);
+            $judulBuku = $buku->judul;
+
+            // Delete buku
+            $buku->delete();
+
+            // Redirect dengan success message
+            return redirect()->route('buku.index')
+                ->with('success', "Buku '{$judulBuku}' berhasil dihapus!");
+        } catch (\Exception $e) {
+            // Redirect dengan error message jika gagal
+            return redirect()->back()
+                ->with('error', 'Gagal menghapus buku: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -160,5 +202,104 @@ class BukuController extends Controller
             'bukuHabis',
             'kategori'
         ));
+    }
+
+    /**
+     * Hapus beberapa buku sekaligus (Bulk Delete)
+     */
+    public function bulkDelete(Request $request)
+    {
+        // Bug #1: hapus dd() ini
+        // dd($request->all());
+
+        try {
+            $request->validate([
+                'buku_ids'   => 'required|array|min:1',
+                'buku_ids.*' => 'integer',
+            ], [
+                'buku_ids.required' => 'Pilih minimal 1 buku yang ingin dihapus.',
+                'buku_ids.min'      => 'Pilih minimal 1 buku.',
+            ]);
+
+            $ids    = $request->buku_ids;
+            $jumlah = Buku::whereIn('id', $ids)->count();
+
+            Buku::whereIn('id', $ids)->delete();
+
+            return redirect()->route('buku.index')
+                ->with('success', "{$jumlah} buku berhasil dihapus!");
+        } catch (ValidationException $e) {
+            // Bug #2: tangkap validasi dulu, redirect back dengan pesan yang jelas
+            return redirect()->back()
+                ->with('error', 'Pilih minimal 1 buku yang ingin dihapus.');
+        } catch (\Exception $e) {
+            return redirect()->route('buku.index')
+                ->with('error', 'Gagal menghapus buku: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Export seluruh data buku ke file CSV
+     */
+    public function export()
+    {
+        // Ambil semua data buku dari database
+        $bukus = Buku::all();
+
+        // Nama file dengan timestamp supaya tidak bentrok
+        $filename = 'data_buku_' . date('Y-m-d_His') . '.csv';
+
+        // Header HTTP agar browser langsung mendownload file
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        // Callback yang menulis isi CSV baris per baris
+        $callback = function () use ($bukus) {
+            $file = fopen('php://output', 'w');
+
+            // BOM (Byte Order Mark) agar Excel bisa baca karakter Indonesia dengan benar
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            // Baris pertama = header kolom
+            fputcsv($file, [
+                'Kode Buku',
+                'Judul',
+                'Kategori',
+                'Pengarang',
+                'Penerbit',
+                'Tahun Terbit',
+                'ISBN',
+                'Bahasa',
+                'Harga (Rp)',
+                'Stok',
+                'Deskripsi',
+                'Tanggal Input',
+            ]);
+
+            // Baris data
+            foreach ($bukus as $buku) {
+                fputcsv($file, [
+                    $buku->kode_buku,
+                    $buku->judul,
+                    $buku->kategori,
+                    $buku->pengarang,
+                    $buku->penerbit,
+                    $buku->tahun_terbit,
+                    $buku->isbn ?? '-',
+                    $buku->bahasa,
+                    $buku->harga,
+                    $buku->stok,
+                    $buku->deskripsi ?? '-',
+                    $buku->created_at->format('d/m/Y H:i'),
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        // Kirim response berupa stream (tidak perlu simpan file di server)
+        return response()->stream($callback, 200, $headers);
     }
 }

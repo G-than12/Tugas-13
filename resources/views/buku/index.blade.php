@@ -8,9 +8,20 @@
             <i class="bi bi-book"></i>
             Daftar Buku
         </h1>
-        <a href="{{ route('buku.create') }}" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Tambah Buku
-        </a>
+        <div class="d-flex gap-2">
+            <button type="button" id="btn-bulk-delete" class="btn btn-danger d-none" onclick="konfirmasiBulkDelete()">
+                <i class="bi bi-trash"></i>
+                Hapus Terpilih (<span id="jumlah-terpilih">0</span>)
+            </button>
+
+            <a href="{{ route('buku.export') }}" class="btn btn-success">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+            </a>
+
+            <a href="{{ route('buku.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Tambah Buku
+            </a>
+        </div>
     </div>
 
     {{-- Statistik Cards --}}
@@ -99,7 +110,7 @@
         </div>
     </div>
 
-    {{-- ===== FORM SEARCH & FILTER ADVANCED (TUGAS 3) ===== --}}
+    {{-- Form Search & Filter Advanced --}}
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-light">
             <h6 class="mb-0"><i class="bi bi-search"></i> Pencarian & Filter Advanced</h6>
@@ -107,15 +118,11 @@
         <div class="card-body">
             <form action="{{ route('buku.search') }}" method="GET">
                 <div class="row g-2">
-
-                    {{-- Input Keyword --}}
                     <div class="col-md-4">
                         <label class="form-label small fw-semibold">Keyword</label>
                         <input type="text" name="keyword" class="form-control form-control-sm"
                             placeholder="Cari judul, pengarang, penerbit..." value="{{ request('keyword') }}">
                     </div>
-
-                    {{-- Filter Kategori Dropdown --}}
                     <div class="col-md-2">
                         <label class="form-label small fw-semibold">Kategori</label>
                         <select name="kategori" class="form-select form-select-sm">
@@ -129,8 +136,6 @@
                             @endisset
                         </select>
                     </div>
-
-                    {{-- Filter Tahun Dropdown --}}
                     <div class="col-md-2">
                         <label class="form-label small fw-semibold">Tahun</label>
                         <select name="tahun" class="form-select form-select-sm">
@@ -144,20 +149,18 @@
                             @endisset
                         </select>
                     </div>
-
-                    {{-- Filter Ketersediaan --}}
                     <div class="col-md-2">
                         <label class="form-label small fw-semibold">Ketersediaan</label>
                         <select name="ketersediaan" class="form-select form-select-sm">
                             <option value="">Semua</option>
-                            <option value="tersedia" {{ request('ketersediaan') == 'tersedia' ? 'selected' : '' }}>Tersedia
+                            <option value="tersedia" {{ request('ketersediaan') == 'tersedia' ? 'selected' : '' }}>
+                                Tersedia
                             </option>
-                            <option value="habis" {{ request('ketersediaan') == 'habis' ? 'selected' : '' }}>Habis
+                            <option value="habis" {{ request('ketersediaan') == 'habis' ? 'selected' : '' }}>
+                                Habis
                             </option>
                         </select>
                     </div>
-
-                    {{-- Tombol Cari & Reset --}}
                     <div class="col-md-2 d-flex align-items-end gap-2">
                         <button type="submit" class="btn btn-primary btn-sm w-100">
                             <i class="bi bi-search"></i> Cari
@@ -166,19 +169,50 @@
                             <i class="bi bi-x-circle"></i> Reset
                         </a>
                     </div>
-
                 </div>
             </form>
         </div>
     </div>
-    {{-- ===== AKHIR FORM SEARCH ===== --}}
 
-    {{-- Daftar Buku --}}
-    <h5 class="mt-5 mb-3 text-muted"><i class="bi bi-grid-3x3-gap"></i> Tampilan Grid (BukuCard Component)</h5>
+    {{-- Header Grid + Pilih Semua --}}
+    <div class="d-flex justify-content-between align-items-center mt-5 mb-3">
+        <h5 class="text-muted mb-0">
+            <i class="bi bi-grid-3x3-gap"></i> Tampilan Grid (BukuCard Component)
+        </h5>
+        <label for="select-all" class="d-flex align-items-center gap-2 mb-0" style="cursor: pointer;">
+            <input class="form-check-input m-0" type="checkbox" id="select-all"
+                style="width: 1.1rem; height: 1.1rem; cursor: pointer;">
+            <span class="text-muted small">Pilih Semua</span>
+        </label>
+    </div>
+
+    {{-- Form Bulk Delete — DILUAR grid, tidak membungkus buku-card --}}
+    <form id="form-bulk-delete" action="{{ route('buku.bulk-delete') }}" method="POST">
+        @csrf
+        {{-- Checkbox ID akan diisi oleh JavaScript saat submit --}}
+        <div id="hidden-ids"></div>
+    </form>
+
+    {{-- Grid Buku — TERPISAH dari form bulk delete --}}
     <div class="row">
         @forelse($bukus as $buku)
             <div class="col-md-4 col-lg-3 mb-4">
-                <x-buku-card :buku="$buku" />
+                <div class="position-relative">
+
+                    {{-- Checkbox pill pojok kiri atas --}}
+                    <label for="buku-{{ $buku->id }}"
+                        class="position-absolute top-0 start-0 z-3 m-2
+                           d-flex align-items-center gap-1
+                           bg-white rounded-pill px-2 py-1 shadow-sm
+                           text-muted small"
+                        style="cursor: pointer; border: 1px solid #dee2e6;">
+                        <input class="form-check-input checkbox-buku m-0" type="checkbox" data-id="{{ $buku->id }}"
+                            id="buku-{{ $buku->id }}" style="width: 1rem; height: 1rem; cursor: pointer;">
+                        <span>Pilih</span>
+                    </label>
+
+                    <x-buku-card :buku="$buku" />
+                </div>
             </div>
         @empty
             <div class="col-12">
@@ -197,4 +231,81 @@
             </p>
         </div>
     @endif
+
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+
+            const selectAll = document.getElementById('select-all');
+
+            // ===== SELECT ALL =====
+            selectAll.addEventListener('change', function() {
+                document.querySelectorAll('.checkbox-buku').forEach(cb => {
+                    cb.checked = this.checked;
+                });
+                updateJumlahTerpilih();
+            });
+
+            // ===== PANTAU SETIAP CHECKBOX BUKU =====
+            document.querySelectorAll('.checkbox-buku').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const adaYangTidakCentang = document.querySelectorAll(
+                        '.checkbox-buku:not(:checked)').length;
+                    selectAll.checked = adaYangTidakCentang === 0;
+                    updateJumlahTerpilih();
+                });
+            });
+
+            // ===== UPDATE COUNTER & TOMBOL =====
+            function updateJumlahTerpilih() {
+                const terpilih = document.querySelectorAll('.checkbox-buku:checked').length;
+                document.getElementById('jumlah-terpilih').textContent = terpilih;
+
+                const btnBulk = document.getElementById('btn-bulk-delete');
+                if (terpilih > 0) {
+                    btnBulk.classList.remove('d-none');
+                } else {
+                    btnBulk.classList.add('d-none');
+                }
+            }
+
+            // ===== KONFIRMASI BULK DELETE =====
+            window.konfirmasiBulkDelete = function() {
+                const jumlah = document.querySelectorAll('.checkbox-buku:checked').length;
+
+                Swal.fire({
+                    title: 'Konfirmasi Hapus',
+                    text: `Anda akan menghapus ${jumlah} buku sekaligus. Tindakan ini tidak bisa dibatalkan!`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Hapus Semua!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+
+                        // Ambil semua ID yang dicentang
+                        const hiddenIds = document.getElementById('hidden-ids');
+                        hiddenIds.innerHTML = ''; // kosongkan dulu
+
+                        // Masukkan ID ke dalam form sebagai hidden input
+                        document.querySelectorAll('.checkbox-buku:checked').forEach(cb => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'buku_ids[]';
+                            input.value = cb.dataset.id;
+                            hiddenIds.appendChild(input);
+                        });
+
+                        // Submit form
+                        document.getElementById('form-bulk-delete').submit();
+                    }
+                });
+            }
+
+        });
+    </script>
+@endpush

@@ -22,6 +22,9 @@ Route::get('/buku/kategori/{kategori}', [BukuController::class, 'filterKategori'
 
 Route::get('/buku/search', [BukuController::class, 'search'])->name('buku.search');
 
+Route::post('/buku/bulk-delete', [BukuController::class, 'bulkDelete'])->name('buku.bulk-delete');
+
+Route::get('/buku/export', [BukuController::class, 'export'])->name('buku.export');
 // Resource route untuk Buku
 // Otomatis membuat: buku.index, buku.create, buku.store,
 //                   buku.show, buku.edit, buku.update, buku.destroy
